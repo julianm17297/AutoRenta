@@ -9,6 +9,10 @@ Implementa el flujo principal de la historia **HU-01 Reservar vehículo**:
 4. Pago en línea (pasarela simulada en modo de pruebas).
 5. Confirmación con código único, comprobante PDF, factura XML y correo de confirmación (simulado).
 
+## Demostración
+
+![Demostración del flujo de reserva](docs/demo_autorenta.gif)
+
 **Tecnologías:** C# · ASP.NET Core 8 (API REST + Blazor) · Entity Framework Core · SQL Server LocalDB.
 
 ---

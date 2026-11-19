@@ -486,3 +486,5 @@ $RECYCLE.BIN/
 # AutoRenta: archivos generados al ejecutar
 AutoRenta.Web/Salidas/
 *.db
+*.db-shm
+*.db-wal

@@ -3,7 +3,7 @@
    si no, se dibuja una ilustración según la carrocería (categoría). *@
 @inject IWebHostEnvironment Env
 
-<div class="vv-escenario @(Grande ? "grande" : "")">
+<div class="vv-escenario @(Grande ? "grande" : "") @(foto is not null ? "con-foto" : "")">
     <div class="vv-brillo"></div>
     @if (foto is not null)
     {
