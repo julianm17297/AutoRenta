@@ -1,0 +1,151 @@
+@page "/reservar/{Id:int}"
+@inject ReservaApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Reservar · AutoRenta</PageTitle>
+
+<Pasos Actual="2" />
+
+@if (vehiculo is null)
+{
+    <p class="ar-cargando">@(error ?? "Cargando…")</p>
+}
+else
+{
+    <a href="/" class="ar-volver"><Icono Nombre="atras" /> Volver a la flota</a>
+    <h1 class="ar-h1">Reserva tu <em>@vehiculo.Marca @vehiculo.Modelo</em></h1>
+
+    <div class="ar-dos-columnas">
+        <section class="ar-panel">
+            <div class="ar-bloque">
+                <h2><span class="ar-num">1</span> ¿Cuándo lo necesitas?</h2>
+                <div class="ar-fila-2">
+                    <div>
+                        <label>Fecha de recogida</label>
+                        <input type="date" class="form-control" min="@DateTime.Today.ToString("yyyy-MM-dd")" value="@inicio.ToString("yyyy-MM-dd")" @onchange="CambiarInicio" />
+                    </div>
+                    <div>
+                        <label>Fecha de devolución</label>
+                        <input type="date" class="form-control" min="@inicio.AddDays(1).ToString("yyyy-MM-dd")" value="@fin.ToString("yyyy-MM-dd")" @onchange="CambiarFin" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="ar-bloque">
+                <h2><span class="ar-num">2</span> Elige tu tarifa</h2>
+                <div class="ar-tarifas">
+                    @foreach (var t in tarifas)
+                    {
+                        <label class="ar-tarifa @(tarifa == t.Clave ? "activa" : "")">
+                            <input type="radio" name="tarifa" checked="@(tarifa == t.Clave)" @onchange="() => CambiarTarifa(t.Clave)" />
+                            <Icono Nombre="@(t.Clave == "estandar" ? "check" : "escudo")" />
+                            <b>@t.Nombre</b>
+                            <small>@t.Descripcion</small>
+                        </label>
+                    }
+                </div>
+            </div>
+
+            <div class="ar-bloque">
+                <h2><span class="ar-num">3</span> Tus datos</h2>
+                <div class="ar-fila-2">
+                    <div>
+                        <label>Nombre completo</label>
+                        <input class="form-control" @bind="nombre" placeholder="Ej.: Laura Gómez" />
+                    </div>
+                    <div>
+                        <label>Correo electrónico</label>
+                        <input class="form-control" type="email" @bind="correo" placeholder="laura@correo.com" />
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <aside class="ar-panel ar-resumen">
+            <VistaVehiculo Vehiculo="vehiculo" />
+            <div class="ar-vehiculo-titulo">
+                <h3>@vehiculo.Marca @vehiculo.Modelo</h3>
+                <span class="ar-categoria">@vehiculo.Categoria</span>
+            </div>
+            <ul class="ar-specs">
+                <li><Icono Nombre="asiento" /> @vehiculo.Puestos</li>
+                <li><Icono Nombre="cambios" /> @vehiculo.Transmision</li>
+                <li>Placa @vehiculo.Placa</li>
+            </ul>
+
+            @if (cotizacion is not null)
+            {
+                <table class="ar-desglose">
+                    <tr><td>@Pesos(cotizacion.TarifaDiaria) × @cotizacion.Dias día(s)</td><td>@Pesos(cotizacion.Subtotal)</td></tr>
+                    @if (cotizacion.Seguro > 0) { <tr><td>Seguro todo riesgo</td><td>@Pesos(cotizacion.Seguro)</td></tr> }
+                </table>
+                <div class="ar-total">
+                    <span>Total estimado</span>
+                    <b>@Pesos(cotizacion.Total)</b>
+                </div>
+            }
+
+            @if (error is not null) { <div class="ar-alerta error">@error</div> }
+
+            <button class="ar-btn ar-btn-primario ar-btn-bloque" disabled="@(enviando || cotizacion is null)" @onclick="Confirmar">
+                @(enviando ? "Registrando…" : "Confirmar reserva")
+            </button>
+            <p class="ar-nota"><Icono Nombre="candado" /> Al confirmar, el vehículo queda bloqueado para ti durante 15 minutos mientras pagas.</p>
+        </aside>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private VehiculoDto? vehiculo;
+    private List<TarifaDto> tarifas = new();
+    private CotizacionDto? cotizacion;
+    private DateTime inicio = DateTime.Today.AddDays(1), fin = DateTime.Today.AddDays(4);
+    private string tarifa = "estandar", nombre = "", correo = "";
+    private string? error;
+    private bool enviando;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var r = await Api.ObtenerVehiculo(Id);
+        if (!r.Ok) { error = r.Error; return; }
+        vehiculo = r.Datos;
+        tarifas = await Api.ObtenerTarifas();
+        await Cotizar();
+    }
+
+    private async Task CambiarInicio(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var d))
+        {
+            inicio = d;
+            if (fin <= inicio) fin = inicio.AddDays(1);
+        }
+        await Cotizar();
+    }
+
+    private async Task CambiarFin(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var d)) fin = d;
+        await Cotizar();
+    }
+
+    private async Task CambiarTarifa(string clave) { tarifa = clave; await Cotizar(); }
+
+    private async Task Cotizar()
+    {
+        var r = await Api.Cotizar(new CotizacionRequest(Id, inicio, fin, tarifa));
+        cotizacion = r.Datos;
+        error = r.Error;
+    }
+
+    private async Task Confirmar()
+    {
+        enviando = true;
+        var r = await Api.CrearReserva(new ReservaRequest(Id, inicio, fin, tarifa, nombre, correo));
+        enviando = false;
+        if (!r.Ok) { error = r.Error; return; }
+        Nav.NavigateTo($"/pago/{r.Datos!.Id}");
+    }
+}

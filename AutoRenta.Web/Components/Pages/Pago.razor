@@ -1,0 +1,142 @@
+@page "/pago/{Id:int}"
+@implements IDisposable
+@inject ReservaApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Pago · AutoRenta</PageTitle>
+
+<Pasos Actual="3" />
+
+@if (reserva is null)
+{
+    <p class="ar-cargando">@(error ?? "Cargando…")</p>
+}
+else
+{
+    <h1 class="ar-h1">Completa tu <em>pago</em></h1>
+
+    <div class="ar-dos-columnas">
+        <section class="ar-panel">
+            <div class="ar-temporizador @(restante.TotalSeconds <= 60 ? "urgente" : "")">
+                <svg viewBox="0 0 44 44" class="ar-anillo">
+                    <circle cx="22" cy="22" r="19" class="fondo" />
+                    <circle cx="22" cy="22" r="19" class="avance" style="stroke-dashoffset:@Desfase" />
+                </svg>
+                <div>
+                    <small>Vehículo apartado para ti</small>
+                    <b>@restante.ToString(@"mm\:ss")</b>
+                </div>
+            </div>
+
+            @if (reserva.Estado != "Pendiente")
+            {
+                <div class="ar-alerta aviso">
+                    La reserva está <b>@reserva.Estado.ToLower()</b>. @reserva.Observacion
+                    <a href="/">Volver a la flota</a>
+                </div>
+            }
+            else
+            {
+                <div class="ar-tarjeta-credito @(Marca.ToLower())">
+                    <div class="ar-tc-fila"><span class="ar-tc-chip"></span><span class="ar-tc-marca">@Marca</span></div>
+                    <div class="ar-tc-numero">@NumeroVisible</div>
+                    <div class="ar-tc-fila">
+                        <div><small>Titular</small><span>@(string.IsNullOrWhiteSpace(titular) ? "NOMBRE APELLIDO" : titular.ToUpper())</span></div>
+                        <div><small>Vence</small><span>@(string.IsNullOrWhiteSpace(vencimiento) ? "MM/AA" : vencimiento)</span></div>
+                    </div>
+                </div>
+
+                <label>Nombre del titular</label>
+                <input class="form-control" @bind="titular" @bind:event="oninput" />
+                <label class="mt-3">Número de tarjeta</label>
+                <input class="form-control" @bind="numero" @bind:event="oninput" maxlength="19" placeholder="4242 4242 4242 4242" />
+                <div class="ar-fila-2 mt-3">
+                    <div><label>Vencimiento</label><input class="form-control" @bind="vencimiento" @bind:event="oninput" placeholder="MM/AA" maxlength="5" /></div>
+                    <div><label>CVV</label><input class="form-control" @bind="cvv" maxlength="4" placeholder="123" /></div>
+                </div>
+
+                @if (error is not null) { <div class="ar-alerta error">@error</div> }
+
+                <button class="ar-btn ar-btn-primario ar-btn-bloque ar-btn-pagar" disabled="@pagando" @onclick="Pagar">
+                    @(pagando ? "Procesando pago…" : $"Pagar {Pesos(reserva.Total)}")
+                </button>
+                <p class="ar-nota"><Icono Nombre="escudo" /> Pasarela en modo de pruebas (sandbox): no se realizan cobros reales.</p>
+            }
+        </section>
+
+        <aside class="ar-panel ar-resumen">
+            <VistaVehiculo Vehiculo="reserva.Vehiculo" />
+            <div class="ar-vehiculo-titulo">
+                <h3>@reserva.Vehiculo.Marca @reserva.Vehiculo.Modelo</h3>
+                <span class="ar-categoria">@reserva.EstadoVehiculo</span>
+            </div>
+            <table class="ar-desglose">
+                <tr><td>Cliente</td><td>@reserva.Cliente</td></tr>
+                <tr><td>Recogida</td><td>@Fecha(reserva.FechaInicio)</td></tr>
+                <tr><td>Devolución</td><td>@Fecha(reserva.FechaFin)</td></tr>
+                <tr><td>Duración</td><td>@reserva.Dias día(s)</td></tr>
+            </table>
+            <div class="ar-total"><span>Total a pagar</span><b>@Pesos(reserva.Total)</b></div>
+        </aside>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private ReservaDto? reserva;
+    private string titular = "", numero = "", vencimiento = "", cvv = "";
+    private string? error;
+    private bool pagando;
+    private TimeSpan restante;
+    private Timer? reloj;
+
+    private string Digitos => new(numero.Where(char.IsDigit).ToArray());
+    private string Marca => Digitos.StartsWith("4") ? "VISA" : Digitos.StartsWith("5") ? "MASTERCARD" : "TARJETA";
+    private string NumeroVisible
+    {
+        get
+        {
+            var d = Digitos.PadRight(16, '•')[..16];
+            return string.Join(" ", Enumerable.Range(0, 4).Select(i => d.Substring(i * 4, 4)));
+        }
+    }
+    // Avance del anillo: 15 minutos = vuelta completa
+    private string Desfase => (119.4 * (1 - Math.Clamp(restante.TotalSeconds / (ReservaService.MinutosBloqueo * 60), 0, 1))).ToString("0.0", CultureInfo.InvariantCulture);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var r = await Api.ObtenerReserva(Id);
+        if (!r.Ok) { error = r.Error; return; }
+        reserva = r.Datos;
+        titular = reserva!.Cliente;
+        ActualizarRestante();
+        reloj = new Timer(_ => InvokeAsync(() => { ActualizarRestante(); StateHasChanged(); }), null, 1000, 1000);
+    }
+
+    private void ActualizarRestante()
+    {
+        if (reserva is null) return;
+        var r = reserva.VenceBloqueo - DateTime.Now;
+        restante = r < TimeSpan.Zero ? TimeSpan.Zero : r;
+    }
+
+    private async Task Pagar()
+    {
+        error = null;
+        if (string.IsNullOrWhiteSpace(titular) || Digitos.Length < 13 || vencimiento.Length < 4 || cvv.Length < 3)
+        {
+            error = "Completa todos los datos de la tarjeta.";
+            return;
+        }
+        pagando = true;
+        var r = await Api.Pagar(Id, new PagoRequest(titular, numero, vencimiento, cvv));
+        pagando = false;
+        if (!r.Ok) { error = r.Error; return; }
+        if (r.Datos!.Estado == "Confirmada") { Nav.NavigateTo($"/confirmacion/{Id}"); return; }
+        reserva = r.Datos;
+        error = $"Pago rechazado: {r.Datos.Observacion} El vehículo fue liberado.";
+    }
+
+    public void Dispose() => reloj?.Dispose();
+}

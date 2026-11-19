@@ -1,0 +1,14 @@
+FOTOS DE LOS VEHÍCULOS (opcional)
+
+Si quieren mostrar fotos reales en lugar de las ilustraciones, guarden aquí
+una imagen por vehículo con el nombre de la PLACA, por ejemplo:
+
+    JKL123.png   (Kia Picanto)
+    MNO456.png   (Chevrolet Onix)
+    YZA987.png   (Toyota Corolla Cross)
+
+Formatos aceptados: .png, .jpg o .webp. Se ven mejor las fotos con fondo
+transparente (PNG) y el carro de lado o en vista 3/4.
+Usen imágenes propias o con permiso de uso.
+
+

@@ -1,0 +1,121 @@
+@* Muestra el vehículo sobre un "escenario" con brillo.
+   Si existe una foto en wwwroot/img/vehiculos/{PLACA}.png|.jpg|.webp se usa la foto;
+   si no, se dibuja una ilustración según la carrocería (categoría). *@
+@inject IWebHostEnvironment Env
+
+<div class="vv-escenario @(Grande ? "grande" : "")">
+    <div class="vv-brillo"></div>
+    @if (foto is not null)
+    {
+        <img class="vv-foto" src="@foto" alt="@Alt" />
+    }
+    else
+    {
+        <svg viewBox="0 0 400 170" class="vv-svg" role="img" aria-label="@Alt">
+            <defs>
+                <linearGradient id="carroceria-@uid" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="@Aclarar(color, 0.35)" />
+                    <stop offset="0.45" stop-color="@color" />
+                    <stop offset="1" stop-color="@Aclarar(color, -0.45)" />
+                </linearGradient>
+                <linearGradient id="vidrio-@uid" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stop-color="#5b6578" />
+                    <stop offset="0.5" stop-color="#1b1f27" />
+                    <stop offset="1" stop-color="#0d0f13" />
+                </linearGradient>
+                <radialGradient id="rin-@uid" cx="0.5" cy="0.4" r="0.6">
+                    <stop offset="0" stop-color="#f2f4f7" />
+                    <stop offset="1" stop-color="#7d8592" />
+                </radialGradient>
+                <clipPath id="clip-@uid"><path d="@forma.Vidrios" /></clipPath>
+                <filter id="sombra-@uid" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="6" /></filter>
+            </defs>
+
+            <ellipse cx="200" cy="146" rx="175" ry="10" fill="#000" opacity="0.75" filter="url(#sombra-@uid)" />
+            <path d="@forma.Cuerpo" fill="url(#carroceria-@uid)" stroke="@Aclarar(color, -0.55)" stroke-width="1.2" />
+            <path d="@forma.Vidrios" fill="url(#vidrio-@uid)" />
+            <g clip-path="url(#clip-@uid)">
+                @foreach (var x in forma.Pilares)
+                {
+                    <rect x="@(x - 3)" y="30" width="6" height="60" fill="@Aclarar(color, -0.35)" />
+                }
+            </g>
+            <path d="@forma.Brillo" fill="none" stroke="#fff" stroke-opacity="0.35" stroke-width="2" stroke-linecap="round" />
+            <path d="@forma.Puertas" fill="none" stroke="#000" stroke-opacity="0.35" stroke-width="1.2" />
+            <rect x="@(forma.Frente - 16)" y="@forma.AlturaLuces" width="14" height="7" rx="3" fill="#fff6c9" />
+            <rect x="@(forma.Atras + 2)" y="@forma.AlturaLuces" width="9" height="8" rx="2" fill="#d6332b" />
+
+            @foreach (var cx in forma.Ruedas)
+            {
+                <g transform="translate(@cx,@forma.EjeY)">
+                    <circle r="25" fill="#0b0c0f" />
+                    <circle r="16" fill="url(#rin-@uid)" />
+                    @for (var i = 0; i < 5; i++)
+                    {
+                        <line x1="0" y1="0" x2="0" y2="-14" stroke="#4b525e" stroke-width="3" stroke-linecap="round" transform="rotate(@(i * 72))" />
+                    }
+                    <circle r="4.5" fill="#2b3038" />
+                </g>
+            }
+        </svg>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public VehiculoDto Vehiculo { get; set; } = null!;
+    [Parameter] public bool Grande { get; set; }
+
+    private string? foto;
+    private string color = "#c9ced6";
+    private Forma forma = Formas["Sedán"];
+    private string uid = Guid.NewGuid().ToString("N")[..6];
+    private string Alt => $"{Vehiculo.Marca} {Vehiculo.Modelo}";
+
+    private static readonly string[] Colores = { "#c9ced6", "#eceef2", "#c0392b", "#2f63a3", "#3a3e46", "#6b7280", "#1f7a5c" };
+
+    protected override void OnParametersSet()
+    {
+        forma = Formas.TryGetValue(Vehiculo.Categoria, out var f) ? f : Formas["Sedán"];
+        color = Colores[Math.Abs(Vehiculo.Placa.Sum(c => c)) % Colores.Length];
+        foto = null;
+        foreach (var ext in new[] { "png", "jpg", "webp" })
+        {
+            var ruta = Path.Combine(Env.WebRootPath, "img", "vehiculos", $"{Vehiculo.Placa}.{ext}");
+            if (File.Exists(ruta)) { foto = $"img/vehiculos/{Vehiculo.Placa}.{ext}"; break; }
+        }
+    }
+
+    private static string Aclarar(string hex, double f)
+    {
+        int c(int i) => Convert.ToInt32(hex.Substring(i, 2), 16);
+        int a(int v) => (int)Math.Clamp(f >= 0 ? v + (255 - v) * f : v * (1 + f), 0, 255);
+        return $"#{a(c(1)):X2}{a(c(3)):X2}{a(c(5)):X2}";
+    }
+
+    private record Forma(string Cuerpo, string Vidrios, int[] Pilares, string Brillo, string Puertas, int[] Ruedas, int EjeY, int Frente, int Atras, int AlturaLuces);
+
+    // Siluetas laterales (mirando a la derecha) por tipo de carrocería.
+    private static readonly Dictionary<string, Forma> Formas = new()
+    {
+        ["Económico"] = new( // hatchback
+            "M40,122 L38,92 Q40,79 56,74 Q72,55 102,51 L218,49 Q244,51 270,77 L330,85 Q353,89 357,104 L358,122 Q358,128 350,129 L322,129 A35,35 0 0 0 252,129 L145,129 A35,35 0 0 0 75,129 L47,129 Q40,128 40,122 Z",
+            "M64,77 Q79,60 103,56 L216,54 Q236,56 260,79 Z", new[] { 160 },
+            "M48,96 Q200,90 352,98", "M160,80 L160,124 M245,82 L245,124", new[] { 110, 287 }, 129, 357, 38, 94),
+        ["Sedán"] = new(
+            "M30,122 L28,101 Q30,88 46,86 L120,82 Q146,58 176,52 L244,50 Q270,52 300,80 L350,88 Q372,92 375,106 L376,122 Q376,128 369,129 L332,129 A35,35 0 0 0 262,129 L140,129 A35,35 0 0 0 70,129 L37,129 Q30,128 30,122 Z",
+            "M129,84 Q151,63 178,57 L242,55 Q262,57 288,82 Z", new[] { 206 },
+            "M36,100 Q200,92 370,102", "M206,84 L206,126 M140,86 L142,126", new[] { 105, 297 }, 129, 376, 28, 98),
+        ["SUV"] = new(
+            "M28,118 L26,72 Q28,58 44,56 L70,42 Q78,36 92,36 L238,36 Q252,37 266,48 L300,74 L352,82 Q376,86 378,102 L378,118 Q378,126 370,127 L334,127 A36,36 0 0 0 262,127 L144,127 A36,36 0 0 0 72,127 L34,127 Q28,126 28,118 Z",
+            "M50,62 L78,45 Q84,41 94,41 L236,41 Q248,42 258,52 L290,77 L50,77 Z", new[] { 138, 210 },
+            "M34,90 Q200,84 372,94", "M138,80 L138,122 M210,80 L210,122", new[] { 108, 298 }, 127, 378, 26, 92),
+        ["Camioneta"] = new( // pick-up
+            "M26,118 L24,80 L168,80 L171,44 Q173,36 186,36 L250,36 Q262,37 272,48 L300,76 L352,84 Q376,88 378,104 L378,118 Q378,126 370,127 L336,127 A36,36 0 0 0 264,127 L136,127 A36,36 0 0 0 64,127 L32,127 Q26,126 26,118 Z",
+            "M180,42 L248,42 Q258,43 266,52 L290,77 L180,77 Z", new[] { 226 },
+            "M30,92 Q200,88 372,96", "M168,80 L168,124 M226,80 L226,122 M24,80 L168,80", new[] { 100, 300 }, 127, 378, 24, 94),
+        ["Familiar"] = new( // monovolumen
+            "M26,118 L24,62 Q26,42 46,40 L250,38 Q268,40 282,54 L312,80 L354,86 Q376,90 378,104 L378,118 Q378,126 370,127 L336,127 A36,36 0 0 0 264,127 L136,127 A36,36 0 0 0 64,127 L32,127 Q26,126 26,118 Z",
+            "M40,52 Q42,46 52,46 L248,44 Q262,46 272,58 L298,81 L40,81 Z", new[] { 112, 182, 244 },
+            "M30,94 Q200,88 372,98", "M112,84 L112,124 M182,84 L182,124 M244,84 L244,122", new[] { 100, 300 }, 127, 378, 24, 96),
+    };
+}

@@ -1,0 +1,130 @@
+@page "/"
+@inject ReservaApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Flota · AutoRenta</PageTitle>
+
+<section class="ar-hero">
+    <div class="ar-hero-texto">
+        <span class="ar-sobretitulo">Alquiler de vehículos en Colombia</span>
+        <h1>Tu próximo viaje empieza con el <em>carro correcto</em>.</h1>
+        <p>Elige, cotiza y paga en minutos. Mientras pagas, el vehículo queda apartado solo para ti.</p>
+        <div class="ar-beneficios">
+            <span><Icono Nombre="candado" /> Bloqueo de 15 min</span>
+            <span><Icono Nombre="escudo" /> Pago seguro</span>
+            <span><Icono Nombre="rayo" /> Confirmación al instante</span>
+        </div>
+        <a class="ar-btn ar-btn-primario" href="#flota">Ver la flota <Icono Nombre="flecha" /></a>
+    </div>
+    @if (destacado is not null)
+    {
+        <div class="ar-hero-carro">
+            <VistaVehiculo Vehiculo="destacado" Grande="true" />
+            <div class="ar-hero-precio">
+                <small>Destacado · @destacado.Marca @destacado.Modelo</small>
+                <b>@Pesos(destacado.TarifaDiaria)</b><span> / día</span>
+            </div>
+        </div>
+    }
+</section>
+
+<section id="flota" class="ar-seccion">
+    <div class="ar-seccion-cabecera">
+        <h2>Conoce nuestra <em>flota</em></h2>
+        <p>@(vehiculos?.Count ?? 0) vehículo(s) disponible(s) ahora</p>
+    </div>
+
+    <div class="ar-filtros">
+        <div class="ar-chips">
+            <button class="ar-chip-filtro @(categoria == "" ? "activo" : "")" @onclick='() => FiltrarCategoria("")'>Todos</button>
+            @foreach (var c in categorias)
+            {
+                <button class="ar-chip-filtro @(categoria == c ? "activo" : "")" @onclick="() => FiltrarCategoria(c)">@c</button>
+            }
+        </div>
+        <div class="ar-filtros-derecha">
+            <select class="form-select" value="@transmision" @onchange="FiltrarTransmision" aria-label="Transmisión">
+                <option value="">Cualquier transmisión</option>
+                <option value="Manual">Manual</option>
+                <option value="Automática">Automática</option>
+            </select>
+            <select class="form-select" value="@marca" @onchange="FiltrarMarca" aria-label="Marca">
+                <option value="">Todas las marcas</option>
+                @foreach (var m in marcas) { <option value="@m">@m</option> }
+            </select>
+            <button class="ar-btn ar-btn-fantasma" @onclick="LimpiarFiltros">Limpiar filtros</button>
+        </div>
+    </div>
+
+    @if (vehiculos is null)
+    {
+        <p class="ar-cargando">Cargando flota…</p>
+    }
+    else if (vehiculos.Count == 0)
+    {
+        <div class="ar-panel ar-vacio">
+            <h3>No hay vehículos disponibles con esos filtros</h3>
+            <p>Prueba con otra categoría, transmisión o marca.</p>
+            <button class="ar-btn ar-btn-primario" @onclick="LimpiarFiltros">Limpiar filtros</button>
+        </div>
+    }
+    else
+    {
+        <div class="ar-grid">
+            @foreach (var v in vehiculos)
+            {
+                <article class="ar-vehiculo">
+                    <span class="ar-insignia"><Icono Nombre="check" /> Disponible</span>
+                    <VistaVehiculo Vehiculo="v" />
+                    <div class="ar-vehiculo-info">
+                        <div class="ar-vehiculo-titulo">
+                            <h3>@v.Marca @v.Modelo</h3>
+                            <span class="ar-categoria">@v.Categoria</span>
+                        </div>
+                        <ul class="ar-specs">
+                            <li title="Puestos"><Icono Nombre="asiento" /> @v.Puestos</li>
+                            <li title="Transmisión"><Icono Nombre="cambios" /> @v.Transmision</li>
+                            <li title="Aire acondicionado"><Icono Nombre="aire" /> A/C</li>
+                        </ul>
+                        <div class="ar-vehiculo-pie">
+                            <div>
+                                <small>Valor por día</small>
+                                <b>@Pesos(v.TarifaDiaria)</b>
+                            </div>
+                            <button class="ar-btn ar-btn-primario" @onclick='() => Nav.NavigateTo($"/reservar/{v.Id}")'>Reservar</button>
+                        </div>
+                    </div>
+                </article>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    private List<VehiculoDto>? vehiculos;
+    private VehiculoDto? destacado;
+    private List<string> categorias = new();
+    private List<string> marcas = new();
+    private string categoria = "", transmision = "", marca = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var todos = await Api.ObtenerVehiculos(null, null, null);
+        categorias = todos.Select(v => v.Categoria).Distinct().OrderBy(x => x).ToList();
+        marcas = todos.Select(v => v.Marca).Distinct().OrderBy(x => x).ToList();
+        destacado = todos.FirstOrDefault(v => v.Categoria == "SUV") ?? todos.FirstOrDefault();
+        vehiculos = todos;
+    }
+
+    private async Task FiltrarCategoria(string c) { categoria = c; await Buscar(); }
+    private async Task FiltrarTransmision(ChangeEventArgs e) { transmision = e.Value?.ToString() ?? ""; await Buscar(); }
+    private async Task FiltrarMarca(ChangeEventArgs e) { marca = e.Value?.ToString() ?? ""; await Buscar(); }
+
+    private async Task Buscar() => vehiculos = await Api.ObtenerVehiculos(categoria, transmision, marca);
+
+    private async Task LimpiarFiltros()
+    {
+        categoria = transmision = marca = "";
+        await Buscar();
+    }
+}

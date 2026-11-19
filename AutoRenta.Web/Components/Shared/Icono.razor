@@ -1,0 +1,24 @@
+@* Íconos lineales simples (SVG) *@
+<svg class="ico @Clase" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    @switch (Nombre)
+    {
+        case "asiento": <path d="M7 4v9a3 3 0 0 0 3 3h7M7 13h8a2 2 0 0 1 2 2v5M10 20h7" /> break;
+        case "cambios": <circle cx="6" cy="6" r="2" /><circle cx="12" cy="6" r="2" /><circle cx="18" cy="6" r="2" /><circle cx="6" cy="18" r="2" /><circle cx="12" cy="18" r="2" /><path d="M6 8v8M12 8v8M18 8v4H6" /> break;
+        case "aire": <path d="M12 2v20M4.9 6.5l14.2 11M4.9 17.5l14.2-11M9 3.5l3 2 3-2M9 20.5l3-2 3 2" /> break;
+        case "candado": <rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /> break;
+        case "escudo": <path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z" /><path d="M9 12l2 2 4-4" /> break;
+        case "rayo": <path d="M13 2L4 14h7l-1 8 9-12h-7z" /> break;
+        case "check": <path d="M5 12l5 5 9-10" /> break;
+        case "calendario": <rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /> break;
+        case "flecha": <path d="M5 12h14M13 6l6 6-6 6" /> break;
+        case "atras": <path d="M19 12H5M11 6l-6 6 6 6" /> break;
+        case "descarga": <path d="M12 3v12M7 10l5 5 5-5M5 21h14" /> break;
+        case "correo": <rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /> break;
+        case "reloj": <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /> break;
+    }
+</svg>
+
+@code {
+    [Parameter] public string Nombre { get; set; } = "";
+    [Parameter] public string Clase { get; set; } = "";
+}

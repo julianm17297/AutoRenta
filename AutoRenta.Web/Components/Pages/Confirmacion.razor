@@ -1,0 +1,57 @@
+@page "/confirmacion/{Id:int}"
+@inject ReservaApiClient Api
+
+<PageTitle>Reserva confirmada · AutoRenta</PageTitle>
+
+<Pasos Actual="4" />
+
+@if (reserva is null)
+{
+    <p class="ar-cargando">@(error ?? "Cargando…")</p>
+}
+else
+{
+    <div class="ar-confirmacion">
+        <div class="ar-check"><Icono Nombre="check" /></div>
+        <h1 class="ar-h1">¡Listo, <em>reserva confirmada</em>!</h1>
+        <p class="ar-sub">Tu pago fue aprobado. Enviamos la confirmación a <b>@reserva.Correo</b>.</p>
+
+        <div class="ar-tiquete">
+            <div class="ar-tiquete-carro">
+                <VistaVehiculo Vehiculo="reserva.Vehiculo" />
+            </div>
+            <div class="ar-tiquete-cuerpo">
+                <small>Código de reserva</small>
+                <div class="ar-codigo">@reserva.Codigo</div>
+                <div class="ar-tiquete-datos">
+                    <div><small>Vehículo</small><b>@reserva.Vehiculo.Marca @reserva.Vehiculo.Modelo</b><span>@reserva.Vehiculo.Placa</span></div>
+                    <div><small>Recogida</small><b>@Fecha(reserva.FechaInicio)</b></div>
+                    <div><small>Devolución</small><b>@Fecha(reserva.FechaFin)</b><span>@reserva.Dias día(s)</span></div>
+                    <div><small>Reserva</small><b class="ok">@reserva.Estado</b></div>
+                    <div><small>Vehículo</small><b>@reserva.EstadoVehiculo</b></div>
+                    <div><small>Referencia</small><b>@reserva.ReferenciaPago</b></div>
+                </div>
+                <div class="ar-tiquete-total"><span>Total pagado</span><b>@Pesos(reserva.Total)</b></div>
+            </div>
+        </div>
+
+        <div class="ar-acciones">
+            <a class="ar-btn ar-btn-primario" href="api/reservas/@reserva.Id/comprobante" target="_blank"><Icono Nombre="descarga" /> Descargar comprobante (PDF)</a>
+            <a class="ar-btn ar-btn-secundario" href="api/reservas/@reserva.Id/correo" target="_blank"><Icono Nombre="correo" /> Ver correo enviado</a>
+            <a class="ar-btn ar-btn-fantasma" href="/">Volver a la flota</a>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private ReservaDto? reserva;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var r = await Api.ObtenerReserva(Id);
+        reserva = r.Datos;
+        error = r.Error;
+    }
+}

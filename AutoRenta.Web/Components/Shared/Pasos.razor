@@ -1,0 +1,16 @@
+@* Avance del flujo de reserva *@
+<div class="ar-pasos">
+    @for (var i = 0; i < nombres.Length; i++)
+    {
+        var n = i + 1;
+        <div class="ar-paso @(n < Actual ? "hecho" : n == Actual ? "actual" : "")">
+            <span class="ar-paso-num">@(n < Actual ? "✓" : n.ToString())</span>
+            <span class="ar-paso-txt">@nombres[i]</span>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int Actual { get; set; }
+    private readonly string[] nombres = { "Elige", "Cotiza", "Paga", "Listo" };
+}
